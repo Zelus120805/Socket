@@ -6,7 +6,7 @@ header = 64
 formatMsg = 'utf-8'
 
 serverPort = 65432
-serverIP = '192.168.136.167'
+serverIP = '192.168.0.101'
 
 client= socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -56,7 +56,7 @@ def upload_file(filePath):
         process = (totalBytes/sizeOfFile)*100
        
         if duration > 0:
-            speed = totalBytes/duration
+            
             sys.stdout.write(f"\rProcess: {process:.2f}%")  # Hiển thị trên một dòng
             sys.stdout.flush()  # Cập nhật ngay lập tức
  
@@ -82,7 +82,31 @@ def send_message(msg):
     client.send(msgContent)
 
 #Hàm chuẩn hóa lệnh nhập (cmd)
+def normalize_input(request):
+    #Loại bỏ kí tự, khoảng trắng thừa đầu, cuối
+    request.strip()
+    
+    #Tách thành 2 phần (Hoặc 1 phần)
+    parts = request.split(maxsplit = 1)
+    command = ""
+    filePath = ""
+    if len(parts) > 2 or len(parts) < 1:
+        print("Invalid input")
 
+    if len(parts)==2:
+        command = parts[0]
+        filePath = parts[1]
+        #Chuẩn hóa đường dẫn
+        filePath.strip()
+        if filePath.startswith('"') and filePath.endswith('"'):
+            filePath = filePath[1:-1]
+        if not os.path.exists(filePath):
+            print("Your path isn't exists")    
+    if len(parts) == 1:
+        command = parts[0]
+    return command, filePath
+    
+        
 
 def main():
     isLogined = False
@@ -94,12 +118,9 @@ def main():
         while isLogined:
             request = input()
             send_message(request)
-            if ' ' in request:
-                command, filePath = request.split(' ', maxsplit = 1)
-                filePath = filePath[1:-1]
-            else:
-                command = request
-                filePath = ''
+            command = ""
+            filePath = ""
+            command, filePath = normalize_input(request)
             if command.strip().lower() == 'logout':
                 isLogined = False
                 break
@@ -118,6 +139,8 @@ def main():
                     listFile.append(receive_message())
                 print(*listFile,sep = "\n")           
             else:
+                print("Please input again")
+                os.system('pause')
                 os.system('cls')
                 print(f"Welcome {userName}^^")
 main()

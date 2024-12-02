@@ -10,7 +10,7 @@ header = 64
 formatMsg = 'utf-8'
 
 #Khai báo số hiệu cổng
-serverPort = 12000
+serverPort = 65432
 serverIP = socket.gethostbyname(socket.gethostname())
 #Chỉ định giao thức TCP
 
@@ -88,16 +88,37 @@ def handle_duplicate_file_name(fileName, saveDirectory):
         fileName = fileDuplicate
     return fileName
 
+#Hàm chuẩn hóa lệnh nhận được từ client (cmd)
+def normalize_input(request):
+    #Loại bỏ kí tự, khoảng trắng thừa đầu, cuối
+    request.strip()
+    
+    #Tách thành 2 phần (Hoặc 1 phần)
+    parts = request.split(maxsplit = 1)
+    command = ""
+    filePath = ""
+    if len(parts) > 2 or len(parts) < 1:
+        print("Invalid input")
+
+    if len(parts)==2:
+        command = parts[0]
+        filePath = parts[1]
+        #Chuẩn hóa đường dẫn
+        filePath.strip()
+        if filePath.startswith('"') and filePath.endswith('"'):
+            filePath = filePath[1:-1]
+        if not os.path.exists(filePath):
+            print("Your path isn't exists")    
+    if len(parts) == 1:
+        command = parts[0]
+    return command, filePath
 def function(socketClient, addrClient, userName, isLogined):
     try: 
         while True:
             requestContent = receive_message(socketClient, addrClient)
-            
-            if ' ' in requestContent:
-                command, filePath = requestContent.split(' ', maxsplit = 1)
-                filePath = filePath[1:-1]
-            else:
-                command = requestContent
+            command = ""
+            filePath = ""
+            command, filePath = normalize_input(requestContent)
                 
             if command.strip().lower() == 'close':
             
@@ -173,7 +194,7 @@ def receive_file_from_client(socketClient, addrClient, filePath, userName):
     socketClient.send("Uploaded successfully!".encode(formatMsg))    
     fout.close()
 def send_file_to_client(socketClient, addrClient, fileName):
-    #Lại duyệt thư mục, và tìm xem fileName trong thư mục nào
+    # duyệt thư mục, và tìm xem fileName trong thư mục nào
     currentDir = os.getcwd()
     items = os.path.listDir(currentDir)
     isExist = False
@@ -185,7 +206,6 @@ def send_file_to_client(socketClient, addrClient, fileName):
                 isExist = True
                 break
     if not exists:
-        pass
         return
     #Code tìm thấy 
          
