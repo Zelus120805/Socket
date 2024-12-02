@@ -1,8 +1,11 @@
 ﻿
 #Code cho server
+from genericpath import exists
+from re import L
 import socket
 import threading
 import os
+from tkinter import CURRENT
 header = 64
 formatMsg = 'utf-8'
 
@@ -29,16 +32,17 @@ def receive_message(socketClient, addrClient):
     msgLength = int(socketClient.recv(header).decode(formatMsg))
     msgContent = socketClient.recv(msgLength).decode(formatMsg)
     return msgContent
-    
+ 
 def read_file_user():
     fileUsers = open(get_current_dirname('Users.txt'),"r")
     listUsers = {}
     for line in fileUsers:
-        n,p = line.split(",")
-        listUsers[n] = p
+        n,p = line.strip().split(",")
+        listUsers[n.strip()] = p.strip()
     fileUsers.close()
     return listUsers
 listUsers = read_file_user()
+print(listUsers)
 def client_register(socketClient, addrClient):
     userName = receive_message(socketClient, addrClient)
    
@@ -106,6 +110,8 @@ def function(socketClient, addrClient, userName, isLogined):
                 return isLogined
             elif command.strip().lower() == 'upload' and filePath:
                 receive_file_from_client(socketClient,addrClient,filePath,userName)
+            elif command.strip().lower()=='view':
+                send_list_file_to_client(socketClient,addrClient)
     except: 
         socketClient.close()
         print(f"Disconnected from {addrClient}")
@@ -166,8 +172,50 @@ def receive_file_from_client(socketClient, addrClient, filePath, userName):
     # Gửi phản hồi về client sau khi hoàn tất
     socketClient.send("Uploaded successfully!".encode(formatMsg))    
     fout.close()
+def send_file_to_client(socketClient, addrClient, fileName):
+    #Lại duyệt thư mục, và tìm xem fileName trong thư mục nào
+    currentDir = os.getcwd()
+    items = os.path.listDir(currentDir)
+    isExist = False
+    for name in items:
+        if os.path.isdir(name):
+            listFile = os.path.listDir(name)
+            if fileName in listFile:
+                filePath = os.path.join(currentDir,fileName)
+                isExist = True
+                break
+    if not exists:
+        pass
+        return
+    #Code tìm thấy 
+         
+    #Nếu duyệt hết thư mục vẫn chưa tìm thấy -> Respond: File not found
+    #Nếu tìm thấy => Trả về địa chỉ và out vòng lặp
+    #Mở file lên đọc -> Gửi kích thước file -> Gửi kích thước mỗi lần -> gửi nội dung mỗi lần
+    #Gửi tín hiệu đã gửi file cho client. 
+    # 
+    pass
+def send_message(socketClient, addrClient, msg):
+    msgContent = msg.encode(formatMsg)
+    msgLength = len(msgContent)
+    sendLength = str(msgLength).encode(formatMsg)
+    sendLength += b' '*(header - len(sendLength))
+    socketClient.send(sendLength)
+    socketClient.send(msgContent)
     
-
+def send_list_file_to_client(socketClient, addrClient):
+    currentDir = os.getcwd()
+    items = os.listdir(currentDir)
+    listFile = []
+    for name in items:
+        if os.path.isdir(name):
+            fileInName = os.listdir(name)
+            for fileName in fileInName:
+                listFile.append(fileName)
+    print(*listFile, sep = "\n")
+    send_message(socketClient,addrClient,str(len(listFile)))
+    for fileName in listFile:
+        send_message(socketClient,addrClient,fileName)
 
 def start_server():
     #Lắng nghe chờ đợi kết nối
