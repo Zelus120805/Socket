@@ -137,9 +137,6 @@ def function(socketClient, addrClient, userName, isLogined):
             elif command.strip().lower()=='view':
                 send_file_to_client_v2(socketClient,addrClient)
             elif command.strip().lower() == 'download':
-                send_list_file_to_client(socketClient,addrClient)
-                fileName = receive_message(socketClient, addrClient)
-                send_file_to_client(socketClient,addrClient,fileName)
                 print("Tới đây!!")
     except: 
         socketClient.close()
@@ -200,42 +197,24 @@ def receive_file_from_client(socketClient, addrClient, filePath, userName):
     # Gửi phản hồi về client sau khi hoàn tất
     socketClient.send("Uploaded successfully!".encode(formatMsg))    
     fout.close()
-def send_file_to_client(socketClient, addrClient, fileName):
-    # duyệt thư mục, và tìm xem fileName trong thư mục nào
-    os.chdir(os.path.dirname(os.path.abspath(__file__)))
-    currentDir = os.getcwd()
-    #Tìm xem file đó được lưu ở đâu
+def send_file_to_client(socketClient, addrClient, filePath):
     
-    items = os.listdir(currentDir)
-    print(items)
-    isExist = False
-    for name in items:
-        if os.path.isdir(name):
-            listFile = os.listdir(name)
-            if fileName in listFile:
-                filePath = os.path.join(os.path.join(currentDir,name),fileName)
-                isExist = True
-                break
-  
-    if not isExist:
-      
-        send_message(socketClient, addrClient,'0') #TÍn hiệu báo file không tồn tại
-        
-        return
-    else:
-        
-        send_message(socketClient, addrClient,'1') #Tín hiệu báo file tồn tại
-       
     #Lấy kích thước file
     print(filePath)
     sizeOfFile = os.path.getsize(filePath)
     #Gửi kích thước file cho client
     print(sizeOfFile)
-    send_message(socketClient, addrClient,str(sizeOfFile))
-    fin = open(filePath,"rb")
+    send_message(socketClient, addrClient,str(sizeOfFile))  #GỬI KÍCH THƯỚC FILE 
+    
+    try:
+        fin = open(filePath, "rb")
+    except:
+        print("Cannot open this file")
+        return False
+    
     totalBytes = 0
     while totalBytes < sizeOfFile:
-        data = fin.read(500)# Mỗi lần đọc tối đa 1Mb
+        data = fin.read(1024)# Mỗi lần đọc tối đa 1Kb
         if not data:
              break
         

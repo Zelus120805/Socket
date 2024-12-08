@@ -21,14 +21,15 @@ localIP, localPORT = client.getsockname()
 root = tk.Tk()
 #Định nghĩa toàn cục node root
 class Node:
-    def __init__(self, fileName, size, dateModified):
+    def __init__(self, fileName, size, dateModified, path):
         self.name = fileName
         self.size = size
         self.dateModified = dateModified
+        self.path = path #Thêm thuộc tính đường dẫn bên server, tiện cho việc truy xuất
         self.children = []
     def add_child(self, newNode):
         self.children.append(newNode)
-nodeRoot = Node(None, None, None)
+#nodeRoot = Node(None, None, None,None)
 #Định nghĩa toàn cục entry
 entry = None
 #-DOWNLOAD FILE - CÁC HÀM PHỤ TRỢ----------------------------------------------------------------------------
@@ -77,10 +78,10 @@ def show_list_file_v2():
         if selected_node:
             if not selected_node.children:
                entry.delete(0, tk.END)  # Xóa nội dung cũ trong ô nhập
-               entry.insert(0, f'{selected_node.name}')  # Thêm chuỗi upload {file_path} vào ô nhập tin nhắn
+               entry.insert(0, f'download {selected_node.path}')  # Thêm chuỗi upload {file_path} vào ô nhập tin nhắn
                list_window.destroy()
     # Nhận dữ liệu
-    root_node = Node(None, None, None)
+    root_node = Node(None, None, None, None)
     receive_preorder(root_node)
 
     # Tạo cửa sổ hiển thị
@@ -141,14 +142,14 @@ def receive_preorder(root):
         name = receive_message()
         size = receive_message()
         date = receive_message()
-    
+        path = receive_message()
         if root.name == None:
-            root.name, root.size, root.dateModified = (name, size, date)  # Tạo root khi nhận node hợp lệ đầu tiên
+            root.name, root.size, root.dateModified, root.path= (name, size, date, path)  # Tạo root khi nhận node hợp lệ đầu tiên
             for i in range(numChild):
                 receive_preorder(root)
         
         else:
-            newNode = Node(name, size, date)
+            newNode = Node(name, size, date, path)
             root.add_child(newNode)
 
             for i in range(numChild):
