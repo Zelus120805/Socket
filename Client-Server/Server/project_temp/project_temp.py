@@ -303,8 +303,8 @@ def traversal_folder(folderPath, root, level):
         if os.path.isdir(itemPath):
             traversal_folder(itemPath, newNode, level + 1)
 def send_file_to_client_v2(socketClient, addrClient):
+    
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
-
     currentDir = os.getcwd()
     print(currentDir)
     items = os.listdir(currentDir)
@@ -326,6 +326,7 @@ def send_preOrder(socketClient, addrClient, root):
     send_message(socketClient,addrClient,root.name) #Gửi tên
     send_message(socketClient,addrClient,str(root.size)) #Gửi kích thước
     send_message(socketClient,addrClient,str(root.dateModified)) #Gửi ngày sửa đổi
+    send_message(socketClient,addrClient,str(root.path)) #Gửi ngày sửa đổi
     for child in root.children:
         send_preOrder(socketClient, addrClient, child)
 def preOrder(root):
