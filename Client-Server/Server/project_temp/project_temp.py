@@ -1,10 +1,13 @@
 ﻿
 #Code cho server
 from genericpath import exists
+from logging import raiseExceptions
 from re import L
 import socket
+from tabnanny import filename_only
 import threading
 import os
+import datetime
 from tkinter import CURRENT
 header = 64
 formatMsg = 'utf-8'
@@ -132,7 +135,12 @@ def function(socketClient, addrClient, userName, isLogined):
             elif command.strip().lower() == 'upload' and filePath:
                 receive_file_from_client(socketClient,addrClient,filePath,userName)
             elif command.strip().lower()=='view':
+                send_file_to_client_v2(socketClient,addrClient)
+            elif command.strip().lower() == 'download':
                 send_list_file_to_client(socketClient,addrClient)
+                fileName = receive_message(socketClient, addrClient)
+                send_file_to_client(socketClient,addrClient,fileName)
+                print("Tới đây!!")
     except: 
         socketClient.close()
         print(f"Disconnected from {addrClient}")
@@ -155,7 +163,6 @@ def handle_client(socketClient, addrClient):
         while isLogined:
             isLogined = function(socketClient, addrClient, userName, isLogined)
             
-
 def receive_file_from_client(socketClient, addrClient, filePath, userName):
     #"C:\Users\pc\Downloads\CTT105-2-IP&subntting_2.0.pdf"
 
@@ -195,18 +202,53 @@ def receive_file_from_client(socketClient, addrClient, filePath, userName):
     fout.close()
 def send_file_to_client(socketClient, addrClient, fileName):
     # duyệt thư mục, và tìm xem fileName trong thư mục nào
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
     currentDir = os.getcwd()
-    items = os.path.listDir(currentDir)
+    #Tìm xem file đó được lưu ở đâu
+    
+    items = os.listdir(currentDir)
+    print(items)
     isExist = False
     for name in items:
         if os.path.isdir(name):
-            listFile = os.path.listDir(name)
+            listFile = os.listdir(name)
             if fileName in listFile:
-                filePath = os.path.join(currentDir,fileName)
+                filePath = os.path.join(os.path.join(currentDir,name),fileName)
                 isExist = True
                 break
-    if not exists:
+  
+    if not isExist:
+      
+        send_message(socketClient, addrClient,'0') #TÍn hiệu báo file không tồn tại
+        
         return
+    else:
+        
+        send_message(socketClient, addrClient,'1') #Tín hiệu báo file tồn tại
+       
+    #Lấy kích thước file
+    print(filePath)
+    sizeOfFile = os.path.getsize(filePath)
+    #Gửi kích thước file cho client
+    print(sizeOfFile)
+    send_message(socketClient, addrClient,str(sizeOfFile))
+    fin = open(filePath,"rb")
+    totalBytes = 0
+    while totalBytes < sizeOfFile:
+        data = fin.read(500)# Mỗi lần đọc tối đa 1Mb
+        if not data:
+             break
+        
+        finLength = len(data)
+        sendLength = str(finLength).encode()
+        sendLength += b' '*(header - len(sendLength))
+        socketClient.send(sendLength)
+        socketClient.send(data)
+        totalBytes += len(data)
+    #Tín hiệu kết thúc file
+    sendLength = str(0).encode(formatMsg)
+    sendLength += b' ' * (header - len(sendLength))
+    socketClient.send(sendLength)
     #Code tìm thấy 
          
     #Nếu duyệt hết thư mục vẫn chưa tìm thấy -> Respond: File not found
@@ -222,21 +264,121 @@ def send_message(socketClient, addrClient, msg):
     sendLength += b' '*(header - len(sendLength))
     socketClient.send(sendLength)
     socketClient.send(msgContent)
-    
-def send_list_file_to_client(socketClient, addrClient):
+class Node:
+    def __init__(self, fileName, size, dateModified):
+        self.name = fileName
+        self.size = size
+        self.dateModified = dateModified 
+        self.children = []
+    def add_child(self, newNode):
+        self.children.append(newNode)
+
+#-test hàm------------------------------------------------------
+class Node:
+    def __init__(self, fileName, size, dateModified, path, level):
+        self.level = level
+        self.name = fileName
+        self.size = size
+        self.dateModified = dateModified 
+        self.path = path
+        self.children = []
+    def add_child(self, newNode):
+        self.children.append(newNode)
+
+def get_info(filePath):
+    #Lấy kích thước file
+    sizeOfFile = os.path.getsize(filePath)
+                
+    #Lấy thời gian (time modified)
+    timeStamp = os.path.getmtime(filePath)
+    dateModified = datetime.datetime.fromtimestamp(timeStamp).date()
+    return sizeOfFile, dateModified
+def traversal_folder(folderPath, root, level):
+    listItem = os.listdir(folderPath)
+    for item in listItem:
+        itemPath = os.path.join(folderPath,item)
+        size, date = get_info(itemPath)
+        newNode = Node(item, size, date, itemPath, level)
+        root.add_child(newNode)
+        if os.path.isdir(itemPath):
+            traversal_folder(itemPath, newNode, level + 1)
+def send_file_to_client_v2(socketClient, addrClient):
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
     currentDir = os.getcwd()
+    print(currentDir)
+    items = os.listdir(currentDir)
+    #Khởi tạo cây thư mục. 
+    root = Node('availableFile',0,'','',0)
+    for name in items:
+        itemPath = os.path.join(currentDir, name)
+        if os.path.isdir(itemPath):
+            size, date = get_info(itemPath)
+            newNode = Node(name, size, date, itemPath, 1)
+            root.add_child(newNode)
+            traversal_folder(itemPath,newNode,2)
+    preOrder(root)
+    send_preOrder(socketClient,addrClient, root)
+def send_preOrder(socketClient, addrClient, root):
+    if not root:
+        return
+    send_message(socketClient,addrClient,str(len(root.children))) #Gửi số con của node đó, báo hiệu rằng n node tiếp theo phải nhận là con của nó. 
+    send_message(socketClient,addrClient,root.name) #Gửi tên
+    send_message(socketClient,addrClient,str(root.size)) #Gửi kích thước
+    send_message(socketClient,addrClient,str(root.dateModified)) #Gửi ngày sửa đổi
+    for child in root.children:
+        send_preOrder(socketClient, addrClient, child)
+def preOrder(root):
+    if not root:
+        return
+
+    # Thụt đầu dòng theo cấp độ
+    indent = "  " * root.level
+    if os.path.isdir(root.path):
+        print(f"{indent}- {root.name} (Size: {root.size}, Modified: {root.dateModified}) - Level {root.level}")
+    else:
+        print(f"{indent}- {root.name} (Size: {root.size}, Modified: {root.dateModified}) - Level {root.level}")
+    # Duyệt qua các nút con
+    for child in root.children :
+        preOrder(child)
+            
+                
+
+def send_list_file_to_client(socketClient, addrClient):
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
+    currentDir = os.getcwd()
+    print(currentDir)
     items = os.listdir(currentDir)
     listFile = []
+    
     for name in items:
-        if os.path.isdir(name):
+        if os.path.isdir(name): #Nếu đó là thư mục, truy cập vào thư mục đó
+            
+            #Liệt kê tất cả file, thư mục (Gọi chung là items) vào list "fileInName
             fileInName = os.listdir(name)
+            
+            #Duyệt thư mục name
             for fileName in fileInName:
-                listFile.append(fileName)
-    print(*listFile, sep = "\n")
+                
+                #Tạo đường dẫn đến file
+                filePath = os.path.join(os.path.join(currentDir,name),fileName)
+                
+                #Lấy kích thước file
+                sizeOfFile = os.path.getsize(filePath)
+                
+                #Lấy thời gian (time modified)
+                timeStamp = os.path.getmtime(filePath)
+                dateModified = datetime.datetime.fromtimestamp(timeStamp).date()
+                
+                #Thêm vào danh sách listFile
+                listFile.append((fileName, sizeOfFile, dateModified))
+                
     send_message(socketClient,addrClient,str(len(listFile)))
-    for fileName in listFile:
-        send_message(socketClient,addrClient,fileName)
-
+    for file in listFile:
+        send_message(socketClient,addrClient,file[0]) #Gửi tên
+        send_message(socketClient,addrClient,str(file[1])) #Gửi kích thước
+        send_message(socketClient,addrClient,str(file[2])) #Gửi ngày sửa đổi
 def start_server():
     #Lắng nghe chờ đợi kết nối
     server.listen()
